@@ -1,6 +1,10 @@
 {
   "name": "Rust Sandbox on Dev Container",
   "image": "mcr.microsoft.com/devcontainers/rust:latest",
+  // GitHub SSH設定
+  "mounts": [
+    "source=${env:HOME}/.ssh,target=/home/vscode/.ssh,type=bind,consistency=cached"
+  ],
   "customizations": {
     "vscode": {
       "extensions": [
