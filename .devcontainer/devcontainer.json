@@ -3,7 +3,7 @@
   "image": "mcr.microsoft.com/devcontainers/rust:latest",
   // GitHub SSH設定
   "mounts": [
-    "source=${env:HOME}/.ssh,target=/home/vscode/.ssh,type=bind,consistency=cached"
+    "source=${env:HOME}/.ssh,target=/home/vscode/.ssh,type=bind,consistency=cached,readonly"
   ],
   "customizations": {
     "vscode": {
