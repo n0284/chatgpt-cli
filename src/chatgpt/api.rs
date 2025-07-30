@@ -1,7 +1,24 @@
-use dotenvy::dotenv;
-use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
-use std::env;
+use reqwest::blocking::Client;
+
+#[derive(Clone, Debug, Serialize)]
+pub struct Message {
+    pub role: String,
+    pub content: String,
+}
+
+#[derive(Serialize)]
+struct ChatRequest<'a> {
+    model: &'a str,
+    messages: Vec<ChatMessage<'a>>,
+}
+
+// APIに送るための借用型（参照型）メッセージ
+#[derive(Serialize)]
+struct ChatMessage<'a> {
+    role: &'a str,
+    content: &'a str,
+}
 
 #[derive(Deserialize)]
 struct ChatResponse {
@@ -10,46 +27,58 @@ struct ChatResponse {
 
 #[derive(Deserialize)]
 struct Choice {
-    message: Message,
+    message: AssistantMessage,
 }
 
 #[derive(Deserialize)]
-struct Message {
+struct AssistantMessage {
     content: String,
 }
 
-#[derive(Serialize)]
-struct ChatRequest<'a> {
-    model: &'a str,
-    messages: Vec<MessageReq<'a>>,
-}
+pub fn fetch_chatgpt_response(
+    user_input: &str,
+    api_key: &str,
+    client: &Client,
+    history: &mut Vec<Message>,
+) -> String {
+    // ユーザー入力を所有型Messageに変換して履歴に追加
+    history.push(Message {
+        role: "user".to_string(),
+        content: user_input.to_string(),
+    });
 
-#[derive(Serialize)]
-struct MessageReq<'a> {
-    role: &'a str,
-    content: &'a str,
-}
+    // 履歴の所有型MessageからAPI送信用の借用型ChatMessageを生成
+    let messages: Vec<ChatMessage> = history
+        .iter()
+        .map(|m| ChatMessage {
+            role: &m.role,
+            content: &m.content,
+        })
+        .collect();
 
-pub fn fetch_chatgpt_response(prompt: &str) -> String {
-    dotenv().ok();
-    let api_key = env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY が .env に定義されていません");
-    let client = Client::new();
-    let body = ChatRequest {
+    let request = ChatRequest {
         model: "gpt-4.1-nano",
-        messages: vec![MessageReq {
-            role: "user",
-            content: prompt,
-        }],
+        messages,
     };
+
+    // println!("📜 APIに送る履歴:\n{:#?}", history);
 
     let res = client
         .post("https://api.openai.com/v1/chat/completions")
         .bearer_auth(api_key)
-        .json(&body)
+        .json(&request)
         .send()
         .unwrap()
         .json::<ChatResponse>()
         .unwrap();
 
-    res.choices[0].message.content.clone()
+    let reply = res.choices[0].message.content.trim().to_string();
+
+    // アシスタントの応答も所有型Messageとして履歴に追加
+    history.push(Message {
+        role: "assistant".to_string(),
+        content: reply.clone(),
+    });
+
+    reply
 }
